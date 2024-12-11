@@ -26,16 +26,31 @@ end
 ---@param price number
 ---@return boolean?
 local function defaultPaymentMethod(playerId, price)
-	local success = ox_inventory:RemoveItem(playerId, 'money', price)
+	local player  = exports.qbx_core:GetPlayer(playerId)
+    if not player or not player.PlayerData.citizenid then 
+        print('Not Player Found')
+        return false 
+    end
 
-	if success then return true end
+    local citizenid = player.PlayerData.citizenid
 
-	local money = ox_inventory:GetItemCount(source, 'money')
+    local playerAccount = exports.ox_banking:GetCharacterAccount(citizenid)
 
-	TriggerClientEvent('ox_lib:notify', source, {
-		type = 'error',
-		description = locale('not_enough_money', price - money)
-	})
+    if not playerAccount then 
+        print('Not Account Found')
+        return false 
+    end
+
+    local accountId = playerAccount.accountId
+
+    local response = exports.ox_banking:RemoveBalance(accountId, price, "Gas Refuel", false)
+
+    if response.success == true then 
+        print('Paid Money')
+        return true 
+    end
+
+    return false
 end
 
 local payMoney = defaultPaymentMethod
