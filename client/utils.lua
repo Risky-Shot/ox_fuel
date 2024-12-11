@@ -50,6 +50,22 @@ function utils.getVehiclePetrolCapBoneIndex(vehicle)
 	end
 end
 
+function utils.DoesVehicleUseFuel(vehicle)
+	if DoesVehicleUseFuel(vehicle) then return true end
+
+end
+
+local min, max, ceil, abs, floor = math.min, math.max, math.ceil, math.abs, math.floor
+
+function utils.clampValue(value, min, max)
+    if value < min then
+        return min
+    elseif value > max then
+        return max
+    else
+        return value
+    end
+end
 ---@return number
 local function defaultMoneyCheck()
 	return exports.ox_inventory:GetItemCount('money')

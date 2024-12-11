@@ -1,4 +1,5 @@
 local config = require 'config'
+local stations = require 'data.stations'
 
 if not config then return end
 
@@ -15,6 +16,8 @@ local function setFuelState(netId, fuel)
 
 	local state = Entity(vehicle)?.state
 	fuel = math.clamp(fuel, 0, 100)
+
+	print('Updated Vehicle', netId, fuel)
 
 	state:set('fuel', fuel, true)
 end
@@ -41,9 +44,9 @@ exports('setPaymentMethod', function(fn)
 	payMoney = fn or defaultPaymentMethod
 end)
 
-RegisterNetEvent('ox_fuel:pay', function(price, fuel, netid)
-	assert(type(price) == 'number', ('Price expected a number, received %s'):format(type(price)))
-
+RegisterNetEvent('ox_fuel:pay', function(totalfuel, initialFuel, netid)
+	local filledFuel  = totalfuel - initialFuel
+	local price = filledFuel * config.defaultPrice
 	if not payMoney(source, price) then return end
 
 	fuel = math.floor(fuel)
@@ -55,38 +58,35 @@ RegisterNetEvent('ox_fuel:pay', function(price, fuel, netid)
 	})
 end)
 
-RegisterNetEvent('ox_fuel:fuelCan', function(hasCan, price)
-	if hasCan then
-		local item = ox_inventory:GetCurrentWeapon(source)
+RegisterNetEvent('ox_fuel:fuelCan', function(currentFuel, stationId)
+	print(currentFuel, stationId)
+	local item = ox_inventory:GetCurrentWeapon(source)
 
-		if not item or item.name ~= 'WEAPON_PETROLCAN' or not payMoney(source, price) then return end
-
-		item.metadata.durability = 100
-		item.metadata.ammo = 100
-
-		ox_inventory:SetMetadata(source, item.slot, item.metadata)
-
-		TriggerClientEvent('ox_lib:notify', source, {
-			type = 'success',
-			description = locale('petrolcan_refill', price)
-		})
-	else
-		if not ox_inventory:CanCarryItem(source, 'WEAPON_PETROLCAN', 1) then
-			return TriggerClientEvent('ox_lib:notify', source, {
-				type = 'error',
-				description = locale('petrolcan_cannot_carry')
-			})
-		end
-
-		if not payMoney(source, price) then return end
-
-		ox_inventory:AddItem(source, 'WEAPON_PETROLCAN', 1)
-
-		TriggerClientEvent('ox_lib:notify', source, {
-			type = 'success',
-			description = locale('petrolcan_buy', price)
-		})
+	if not item or item.name ~= 'WEAPON_PETROLCAN' then 
+		print('No Enough Money')
+		return 
 	end
+
+	local currentFuel = item.metadata.durability or item.metadata.ammo
+	local price = (100-currentFuel) * config.defaultPrice
+
+	if not payMoney(source, price) then
+		TriggerClientEvent('ox_lib:notify', source, {
+			type = 'error',
+			description = locale('not_enough_money', price)
+		})
+		return
+	end
+
+	item.metadata.durability = 100
+	item.metadata.ammo = 100
+
+	ox_inventory:SetMetadata(source, item.slot, item.metadata)
+
+	TriggerClientEvent('ox_lib:notify', source, {
+		type = 'success',
+		description = locale('petrolcan_refill', price)
+	})
 end)
 
 RegisterNetEvent('ox_fuel:updateFuelCan', function(durability, netid, fuel)
@@ -103,4 +103,18 @@ RegisterNetEvent('ox_fuel:updateFuelCan', function(durability, netid, fuel)
 	end
 
 	-- player is sus?
+end)
+
+lib.callback.register('ox_fuel:server:isRefuelAllowed', function(source, stationId, fuelAmount)
+	if not stations[stationId] or not stations[stationId]?.isPlayerOwned then return false end
+
+	local data = MySQL.single.await('SELECT `owned`, `fuel` FROM `fuel_stations` WHERE `stationId` = ? LIMIT 1', {
+		stationId
+	})
+
+	if data.owned  == 1 and data.fuel > fuelAmount and data.fuel > config.stationReserve then
+		return true
+	end
+
+	return false
 end)

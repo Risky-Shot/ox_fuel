@@ -21,6 +21,8 @@ local function startDrivingVehicle()
 
 	if not DoesVehicleUseFuel(vehicle) then return end
 
+	if not NetworkGetEntityIsNetworked(vehicle) then return end
+
 	local vehState = Entity(vehicle).state
 
 	if not vehState.fuel then
@@ -30,18 +32,26 @@ local function startDrivingVehicle()
 
 	SetVehicleFuelLevel(vehicle, vehState.fuel)
 
+	local usage = config.classUsage[GetVehicleClass(vehicle)] or 1.0
+
+	if usage == 0.0 then return end
+
 	local fuelTick = 0
 
 	while cache.seat == -1 do
 		if not DoesEntityExist(vehicle) then return end
 
 		local fuelAmount = tonumber(vehState.fuel)
-		local newFuel = GetVehicleFuelLevel(vehicle)
+		local newFuel = fuelAmount
 
-		if fuelAmount > 0 then
+		if fuelAmount > 0 and GetIsVehicleEngineRunning(vehicle) then
 			if GetVehiclePetrolTankHealth(vehicle) < 700 then
 				newFuel -= math.random(10, 20) * 0.01
 			end
+
+			local rpmMultiplier = config.rpmModifier[math.floor(GetVehicleCurrentRpm(vehicle) * 10) / 10]
+
+			newFuel = fuelAmount - (usage * rpmMultiplier)
 
 			if fuelAmount ~= newFuel then
 				if fuelTick == 15 then
@@ -52,7 +62,6 @@ local function startDrivingVehicle()
 				fuelTick += 1
 			end
 		end
-
 		Wait(1000)
 	end
 
@@ -63,7 +72,11 @@ if cache.seat == -1 then CreateThread(startDrivingVehicle) end
 
 lib.onCache('seat', function(seat)
 	if cache.vehicle then
-		state.lastVehicle = cache.vehicle
+		local vehClass = GetVehicleClass(cache.vehicle)
+
+		if vehClass ~= 13 then
+			state.lastVehicle = cache.vehicle
+		end
 	end
 
 	if seat == -1 then
@@ -123,3 +136,4 @@ end)
 
 RegisterKeyMapping('startfueling', 'Fuel vehicle', 'keyboard', 'e')
 TriggerEvent('chat:removeSuggestion', '/startfueling')
+
