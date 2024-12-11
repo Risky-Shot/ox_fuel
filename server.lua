@@ -64,12 +64,12 @@ RegisterNetEvent('ox_fuel:pay', function(totalfuel, initialFuel, netid)
 	local price = filledFuel * config.defaultPrice
 	if not payMoney(source, price) then return end
 
-	fuel = math.floor(fuel)
-	setFuelState(netid, fuel)
+	totalfuel = math.floor(totalfuel)
+	setFuelState(netid, totalfuel)
 
 	TriggerClientEvent('ox_lib:notify', source, {
 		type = 'success',
-		description = locale('fuel_success', fuel, price)
+		description = locale('fuel_success', totalfuel, price)
 	})
 end)
 
