@@ -20,9 +20,9 @@ end
 ---@param point CPoint
 local function nearbyStation(point)
 	if state.isFueling and state.nozzleEntity then -- for petrol pump
-		qbx.drawText3d({ coords = GetEntityCoords(state.nozzleEntity), text = tostring(state.refillingValue) })
+		qbx.drawText3d({ coords = GetEntityCoords(state.nozzleEntity), text = tostring(math.floor(state.refillingValue)) })
 	elseif state.isFueling then -- for jerry can
-		qbx.drawText3d({ coords = GetEntityCoords(state.lastVehicle), text = tostring(state.refillingValue) })
+		qbx.drawText3d({ coords = GetEntityCoords(state.lastVehicle), text = tostring(math.floor(state.refillingValue)) })
 	end
 end
 
