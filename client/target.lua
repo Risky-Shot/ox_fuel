@@ -24,6 +24,8 @@ local function GenerateNozzleOnPump(pump)
     end
 	RopeLoadTextures()
 
+	Wait(1)
+
     local pumpCoords = GetEntityCoords(pump)
 	state.rope = AddRope(pumpCoords.x, pumpCoords.y, pumpCoords.z, 0.0, 0.0, 0.0, 3.0, 1, 1000.0, 0.0, 1.0, false, false, false, 1.0, false)
 

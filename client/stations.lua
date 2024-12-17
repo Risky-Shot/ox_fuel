@@ -33,7 +33,8 @@ local function onExitStation(point)
 	end
 	state.nearestStation = nil
 
-	if not state.holdingNozzle then return end
+	if state.isFueling then return end
+
 	if state.rope then
 		DeleteRope(state.rope)
 		state.rope = nil
