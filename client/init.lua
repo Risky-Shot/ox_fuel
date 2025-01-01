@@ -14,6 +14,9 @@ local utils = require 'client.utils'
 local state = require 'client.state'
 local fuel  = require 'client.fuel'
 
+local stations = require 'data.stations'
+
+require 'client.target'
 require 'client.stations'
 
 local function startDrivingVehicle()
@@ -84,56 +87,32 @@ lib.onCache('seat', function(seat)
 	end
 end)
 
-if config.ox_target then return require 'client.target' end
-
-RegisterCommand('startfueling', function()
+-- Command to refuel vehicle where there pumps = nil in data/stations.lua (usually helipads and boat areas)
+RegisterCommand('refuel', function()
 	if state.isFueling or cache.vehicle or lib.progressActive() then return end
 
-	local petrolCan = config.petrolCan.enabled and GetSelectedPedWeapon(cache.ped) == `WEAPON_PETROLCAN`
 	local playerCoords = GetEntityCoords(cache.ped)
-	local nearestPump = state.nearestPump
 
-	if nearestPump then
-		local moneyAmount = utils.getMoney()
+	local insideStation = state.nearestStation
 
-		if petrolCan and moneyAmount >= config.petrolCan.refillPrice then
-			return fuel.getPetrolCan(nearestPump, true)
-		end
+	local hasPumps = stations[state.nearestStation]?.pumps
 
-		local vehicleInRange = state.lastVehicle and #(GetEntityCoords(state.lastVehicle) - playerCoords) <= 3
-
-		if not vehicleInRange then
-			if not config.petrolCan.enabled then return end
-
-			if moneyAmount >= config.petrolCan.price then
-				return fuel.getPetrolCan(nearestPump)
-			end
-
-			return lib.notify({ type = 'error', description = locale('petrolcan_cannot_afford') })
-		elseif moneyAmount >= config.priceTick then
-			return fuel.startFueling(state.lastVehicle, true)
-		else
-			return lib.notify({ type = 'error', description = locale('refuel_cannot_afford') })
-		end
-
-		return lib.notify({ type = 'error', description = locale('vehicle_far') })
-	elseif petrolCan then
-		local vehicle = utils.getVehicleInFront()
-
-		if vehicle and DoesVehicleUseFuel(vehicle) then
-
-			local boneIndex = utils.getVehiclePetrolCapBoneIndex(vehicle)
-			local fuelcapPosition = boneIndex and GetWorldPositionOfEntityBone(vehicle, boneIndex)
-
-			if fuelcapPosition and #(playerCoords - fuelcapPosition) < 1.8 then
-				return fuel.startFueling(vehicle, false)
-			end
-
-			return lib.notify({ type = 'error', description = locale('vehicle_far') })
-		end
+	if not insideStation or hasPumps then
+		return lib.notify({ type = 'error', description = locale('not_near_station') })
 	end
+
+	if not config.commandClass[GetVehicleClass(state.lastVehicle)] then
+		return lib.notify({ type = 'error', description = locale('vehicle_class') })
+	end
+
+	local vehicleInRange = state.lastVehicle and #(GetEntityCoords(state.lastVehicle) - playerCoords) <= 3
+
+	if not vehicleInRange then 
+		return lib.notify({ type = 'error', description = locale('vehicle_far') })
+	end
+	--- vehicle, isFromPump
+	fuel.startFueling(state.lastVehicle, true)
 end)
 
-RegisterKeyMapping('startfueling', 'Fuel vehicle', 'keyboard', 'e')
-TriggerEvent('chat:removeSuggestion', '/startfueling')
+--TriggerEvent('chat:removeSuggestion', '/startfueling')
 

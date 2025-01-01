@@ -26,6 +26,8 @@ server_scripts {
 }
 
 client_scripts{
+	'@qbx_core/modules/playerdata.lua',
+	'client/statebag2.lua',
 	'client/init.lua'
 } 
 

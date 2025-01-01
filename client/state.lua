@@ -9,9 +9,10 @@
 local state = {
 	isFueling = false,
 	lastVehicle = cache.vehicle or GetPlayersLastVehicle(),
-	holdingNozzle = false,
-	insertedNozzle = false,
-	refillingValue = 0.0
+	refillingValue = 0.0,
+	currentNozzleId = nil,
+	currentPumpCoords = nil,
+	nearestVehicle = nil
 }
 
 if state.lastVehicle == 0 then state.lastVehicle = nil end
@@ -27,30 +28,12 @@ AddEventHandler('ox_inventory:currentWeapon', setPetrolCan)
 
 AddEventHandler('onResourceStop', function(resource)
 	if resource == GetCurrentResourceName() then
-		if state.rope then
-			DeleteRope(state.rope)
-		end
-
-		if state.nozzleEntity and DoesEntityExist(state.nozzleEntity) then
-			DeleteEntity(state.nozzleEntity)
-		end
 		ClearPedTasks(cache.ped)
-		RopeUnloadTextures()
-		print('Unloaded Data')
 	end
 end)
 
 AddEventHandler('QBCore:Server:OnPlayerUnload', function(source) 
-	if state.rope then
-		DeleteRope(state.rope)
-	end
-
-	if state.nozzleEntity and DoesEntityExist(state.nozzleEntity) then
-		DeleteEntity(state.nozzleEntity)
-	end
-	ClearPedTasks(cache.ped)
-	RopeUnloadTextures()
-	print('Unloaded Data')
+	
 end)
 
 return state

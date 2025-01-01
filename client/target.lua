@@ -3,185 +3,170 @@ local state  = require 'client.state'
 local utils  = require 'client.utils'
 local fuel   = require 'client.fuel'
 
----@field pump entity
-local function GenerateNozzleOnPump(pump)
-	if not lib.requestAnimDict("anim@am_hold_up@male") then print('Failed to load anim.') return end
+local bones = {
+	"petroltank",
+	"petroltank_l",
+	"petroltank_r",
+	"hub_lr",
+	"seat_dside_r",
+}
 
-	TaskPlayAnim(cache.ped, "anim@am_hold_up@male", "shoplift_high", 2.0, 8.0, -1, 50, 0, 0, 0, 0)
+-- Fuel Vehicle (on select -> show menu -> )
+--
+-- Grab Nozzle
 
-	Wait(300)
+exports.ox_target:addGlobalVehicle({
+	{
+		distance = 2,
+		icon = "",
+		label = locale('start_fueling'),
+		onSelect = function(data)
+			if GetIsVehicleEngineRunning(data.entity) then return lib.notify({ type = 'error', description = locale('engine_on') }) end
 
-	state.nozzleEntity = CreateObject(`prop_cs_fuel_nozle`, 0, 0, 0, true, true, true)
+			if not state.currentNozzleId and not state.currentPumpCoords then 
+				return lib.notify({ type = 'error', description = locale('already_nozzle_veh')})
+			end
 
-	SetEntityCollision(state.nozzleEntity, false, true)
+			local netId = VehToNet(data.entity)
 
-	AttachEntityToEntity(state.nozzleEntity, cache.ped, GetPedBoneIndex(cache.ped, 0x49D9), 0.11, 0.02, 0.02, -80.0, -90.0, 15.0, true, true, false, true, 1, true)
+			local hasControl = lib.waitFor(function()
+				NetworkRequestControlOfNetworkId(netId)
+				if NetworkHasControlOfNetworkId(netId) then 
+					print('Received Control of NetId')
+					return true 
+				end
+			end, 'Failed to request Entity Control', 10000)
 
-	RopeLoadTextures()
-    while not RopeAreTexturesLoaded() do
-		RopeLoadTextures()
-        Wait(1)
-    end
-	RopeLoadTextures()
+			if not hasControl then 
+				print('Failed to Get Control of Entity')
+				return 
+			end
 
-	Wait(1)
+			local entState = Entity(data.entity).state
 
-    local pumpCoords = GetEntityCoords(pump)
-	state.rope = AddRope(pumpCoords.x, pumpCoords.y, pumpCoords.z, 0.0, 0.0, 0.0, 3.0, 1, 1000.0, 0.0, 1.0, false, false, false, 1.0, false)
+			if entState and entState.nozzle_veh then 
+				return lib.notify({ type = 'error', description = locale('already_nozzle_veh') })
+			end
 
-	while not state.rope do
-		Wait(0)
-	end
+			Entity(data.entity).state:set('nozzle_veh', {
+				id = state.currentNozzleId,
+				pumpCoords = state.currentPumpCoords,
+				currentFuel = Entity(data.entity).state?.fuel,
+				citizenid = QBX.PlayerData.citizenid
+			}, true)
 
-	local nozzleCoords = GetEntityCoords(state.nozzleEntity)
+			state.currentNozzleId = nil
+			state.currentPumpCoords = nil
 
-	nozzleCoords = GetOffsetFromEntityInWorldCoords(state.nozzleEntity, 0.0, -0.033, -0.195)
+			LocalPlayer.state:set('nozzle_pump', nil, true)
 
-	AttachEntitiesToRope(state.rope, pump, state.nozzleEntity, pumpCoords.x, pumpCoords.y, pumpCoords.z + 1.45, nozzleCoords.x, nozzleCoords.y, nozzleCoords.z, 5.0, false, false, nil, nil)
-end
+			lib.notify({ type = 'success', description = locale('nozzle_veh_success') })
+		end,
+		canInteract = function(entity)
+			if not state.nearestStation or not state.currentNozzleId then
+				return false
+			end
+			return true
+		end,
+		bones = bones
+	},
+	{	
+		icon = "",
+		label = locale('grab_nozzle'),
+		distance = 2,
+		onSelect = function(data)
 
--- required vehicle, tankBone, isBike, tankPos
-local function AttachNozzleToVehicle(vehicle)
-	if not lib.requestAnimDict("timetable@gardener@filling_can") then return false end
+			local netId = VehToNet(data.entity)
 
-	TaskPlayAnim(cache.ped, "timetable@gardener@filling_can", "gar_ig_5_filling_can", 2.0, 8.0, -1, 50, 0, 0, 0, 0)
-	Wait(300)
+			local hasControl = lib.waitFor(function()
+				NetworkRequestControlOfNetworkId(netId)
+				if NetworkHasControlOfNetworkId(netId) then 
+					print('Received Control of NetId')
+					return true 
+				end
+			end, 'Failed to request Entity Control', 10000)
 
-	if vehicle and DoesVehicleUseFuel(vehicle) then
-		print('Vehicle Uses Fuel')
-		local boneIndex = utils.getVehiclePetrolCapBoneIndex(vehicle)
-		print('BoneIndex', boneIndex)
-		local fuelcapPosition = boneIndex and GetWorldPositionOfEntityBone(vehicle, boneIndex)
-		print('CapPos', fuelcapPosition)
+			if not hasControl then 
+				print('Failed to Get Control of Entity')
+				return 
+			end
 
-		local isBike = false
-		local vehClass = GetVehicleClass(vehicle)
-		if vehClass == 8 and vehClass ~= 13 then
-			isBike = true
-		end
+			local entState = Entity(data.entity).state
 
-		if isBike then
-			print('CapPos', fuelcapPosition, state.nozzleEntity)
-			AttachEntityToEntity(state.nozzleEntity, vehicle, boneIndex, 0.0, -0.2, 0.2, -80.0, 0.0, 0.0, true, true, false, false, 1, true)
-		else
-			print('CapPos', fuelcapPosition)
-			AttachEntityToEntity(state.nozzleEntity, vehicle, boneIndex, -0.18, 0.0 , 0.75 , -125.0, -90.0, -90.0, true, true, false, false, 1, true)
-		end
+			if not entState.nozzle_veh then 
+				return 
+			end
 
-		ClearPedTasks(cache.ped)
-		return true
-	else
-		return false
-	end
-end
+			LocalPlayer.state:set('nozzle_pump', {
+				id = entState.nozzle_veh.id,
+				pumpCoords = entState.nozzle_veh.pumpCoords,
+			}, true)
 
-local function GrabNozzleFromVehicle(vehicle)
-	if state.nozzleEntity and DoesEntityExist(state.nozzleEntity) then
-		AttachEntityToEntity(state.nozzleEntity, cache.ped, GetPedBoneIndex(cache.ped, 0x49D9), 0.11, 0.02, 0.02, -80.0, -90.0, 15.0, true, true, false, true, 1, true)
-		state.isFueling = false
-		state.insertedNozzle = false
-		state.holdingNozzle = true
-	end
-end
+			state.currentNozzleId = entState.nozzle_veh.id
+			state.currentPumpCoords = entState.nozzle_veh.pumpCoords
 
-local function AttachNozzleToPump(pump)
-	DeleteEntity(state.nozzleEntity)
-    RopeUnloadTextures()
-    DeleteRope(state.rope)
+			Entity(data.entity).state:set('nozzle_veh', nil, true)
+		end,
+		canInteract = function(entity)
+			if not vehicleHoldingHoses[entity] then return false end
 
-	state.nozzleEntity = nil
-	state.rope = nil
-	state.holdingNozzle = false
-end
-
-if config.useHose then
-	local bones = {
-		"petroltank",
-		"petroltank_l",
-		"petroltank_r",
-		"wheel_rf",
-		"wheel_rr",
-		"petrolcap ",
-		"seat_dside_r",
-		"engine",
+			return true
+		end,
+		bones = bones
 	}
-
-	-- Fuel Vehicle (on select -> show menu -> )
-	--
-	-- Grab Nozzle
-
-	exports.ox_target:addGlobalVehicle({
-		{
-			distance = 2,
-			onSelect = function(data)
-				print('Refuel Started', json.encode(data, {indent = true}))
-				if GetIsVehicleEngineRunning(data.entity) then return lib.notify({ type = 'error', description = locale('engine_on') }) end
-				if AttachNozzleToVehicle(data.entity) then	
-					state.holdingNozzle = false
-					state.insertedNozzle = true
-					fuel.startFueling(state.lastVehicle, 1)
-				end
-			end,
-			icon = "",
-			label = locale('start_fueling'),
-			canInteract = function(entity)
-				if state.isFueling then
-					return false
-				end
-
-				return state.holdingNozzle
-			end,
-			bones = bones
-		},
-		{
-			distance = 2,
-			onSelect = function(data)
-				GrabNozzleFromVehicle(data.entity)
-			end,
-			icon = "",
-			label = locale('grab_nozzle'),
-			canInteract = function(entity)
-				if not state.insertedNozzle then
-					return false
-				end
-
-				return true
-			end,
-			bones = bones
-		}
-	})
-end
+})
 
 exports.ox_target:addModel(config.pumpModels, {
 	{
-		distance = 2,
-		onSelect = function(data)
-			state.holdingNozzle = true
-			GenerateNozzleOnPump(data.entity)
-		end,
 		icon = "fas fa-gas-pump",
 		label = locale('grab_nozzle'),
+		distance = 2,
+		onSelect = function(data)		
+			local pump = utils.getNearestPump(state.nearestStation, GetEntityCoords(data.entity))
+
+			local inUse = lib.callback.await('ox_fuel:server:checkPumpInUse', false, state.nearestStation, pump)
+
+			if inUse then return lib.notify({ type = 'error', description = 'Fuel Pump Already in Use'}) end
+
+			local nozzleId = tostring(state.nearestStation .. ':'..pump)
+			
+			LocalPlayer.state:set('nozzle_pump', {
+				id = nozzleId,
+				pumpCoords = GetEntityCoords(data.entity)
+			}, true)
+
+			-- Wait(100)
+			state.currentNozzleId = nozzleId
+			state.currentPumpCoords = GetEntityCoords(data.entity)
+		end,
 		canInteract = function(entity)
-			if state.isFueling or cache.vehicle or lib.progressActive() or state.holdingNozzle or not state.nearestStation then
+			if state.currentNozzleId or not state.nearestStation then
 				return false
 			end
-
-			return state.lastVehicle and #(GetEntityCoords(state.lastVehicle) - GetEntityCoords(cache.ped)) <= 3
+			return true
 		end
 	},
 	{
 		distance = 2,
-		onSelect = function(data)
-			AttachNozzleToPump(data.entity)
-		end,
 		icon = "fas fa-gas-pump",
 		label = locale('insert_nozzle'),
+		onSelect = function(data)
+			if not state.currentNozzleId or not state.currentPumpCoords then return end
+
+			local removedUse = lib.callback.await('ox_fuel:server:removePumpInUse', false, state.currentNozzleId)
+
+			if not removedUse then return end
+
+			LocalPlayer.state:set('nozzle_pump', nil, true)
+
+			state.currentNozzleId = nil
+			state.currentPumpCoords = nil
+		end,
 		canInteract = function(entity)
-			if state.isFueling or cache.vehicle or lib.progressActive() or not state.holdingNozzle or not state.nearestStation then
+			if not state.currentNozzleId or not state.nearestStation then
 				return false
 			end
-
-			return state.lastVehicle and #(GetEntityCoords(state.lastVehicle) - GetEntityCoords(cache.ped)) <= 3
+			return true
 		end
 	},
 	{
@@ -189,15 +174,15 @@ exports.ox_target:addModel(config.pumpModels, {
 		onSelect = function(data)
 			local petrolCan = config.petrolCan.enabled and GetSelectedPedWeapon(cache.ped) == `WEAPON_PETROLCAN`
 
-			if petrolCan then
-				local currentWeapon = exports.ox_inventory:getCurrentWeapon() 
+			if not petrolCan then return lib.notify({ type = 'error', description = locale('petrolcan_not_equipped') }) end
 
-				if not currentWeapon.hash == `WEAPON_PETROLCAN` then return end
+			local currentWeapon = exports.ox_inventory:getCurrentWeapon() 
 
-				local currentFuel = currentWeapon.metadata?.ammo or 0
+			if not currentWeapon.hash == `WEAPON_PETROLCAN` then return end
 
-				fuel.getPetrolCan(data.coords, currentFuel)
-			end
+			local currentFuel = currentWeapon.metadata?.ammo or 0
+
+			fuel.getPetrolCan(data.coords, currentFuel)
 		end,
 		icon = "fas fa-faucet",
 		label = locale('petrolcan_refill_pump'),
@@ -210,7 +195,6 @@ exports.ox_target:addModel(config.pumpModels, {
 		end
 	}
 })
-
 
 if config.petrolCan.enabled then
 	exports.ox_target:addGlobalVehicle({
@@ -233,7 +217,7 @@ if config.petrolCan.enabled then
 			icon = "fas fa-gas-pump",
 			label = locale('start_fueling'),
 			canInteract = function(entity)
-				if state.isFueling or cache.vehicle or lib.progressActive() or not DoesVehicleUseFuel(entity) then
+				if state.isFueling or cache.vehicle or lib.progressActive() then
 					return false
 				end
 				return state.petrolCan and config.petrolCan.enabled
@@ -242,8 +226,9 @@ if config.petrolCan.enabled then
 	})
 end
 
-RegisterCommand("ox:fuel:debug", function()
-	print('Nozzel Data', state.nozzleEntity, GetEntityCoords(state.nozzleEntity))
-	print(state.lastVehicle)
-	print(Entity(state.lastVehicle).state.fuel)
-end)
+--[[
+	-- Holding Nozzle (Player Entity)
+	-- Inserted Nozzle (Vehicle Entity)
+	-- a variable storing all ropes data
+	-- fueling_rope state (contains vehicle, pump) on pump
+]]

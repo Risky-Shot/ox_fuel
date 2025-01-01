@@ -5,6 +5,8 @@ local fuel = {}
 
 local stations = lib.load 'data.stations'
 
+local math = lib.math
+
 ---@param vehState StateBag
 ---@param vehicle integer
 ---@param amount number
@@ -19,6 +21,7 @@ function fuel.setFuel(vehState, vehicle, amount, replicate)
 	end
 end
 
+-- Used to Refill Fuel Can
 function fuel.getPetrolCan(coords, currentFuel)
 	if state.nearestStation and stations[state.nearestStation].isPlayerOwned then
 		local canRefuel = lib.callback.await('ox_fuel:server:isRefuelAllowed', false, state.nearestStation, 100 - currentFuel)
@@ -28,28 +31,33 @@ function fuel.getPetrolCan(coords, currentFuel)
 		end
 	end
 
-	TaskTurnPedToFaceCoord(cache.ped, coords.x, coords.y, coords.z, config.petrolCan.duration)
+	local duration = math.ceil((100 - currentFuel) / config.refillValue) * config.refillTick
+
+	duration = math.max(duration, 1000) -- Ensure Atleast 1 second progressbar
+
+	TaskTurnPedToFaceCoord(cache.ped, coords.x, coords.y, coords.z, duration)
+
 	Wait(500)
 
-	if lib.progressCircle({
-			duration = config.petrolCan.duration,
-			useWhileDead = false,
-			canCancel = true,
-			disable = {
-				move = true,
-				car = true,
-				combat = true,
-			},
-			anim = {
-				dict = 'timetable@gardener@filling_can',
-				clip = 'gar_ig_5_filling_can',
-				flags = 49,
-			}
-		}) then
+	if lib.progressBar({
+		label = 'Refueling Fuelcan',
+		duration = duration, -- Makre sure it's 1 seconds atleast
+		useWhileDead = false,
+		canCancel = true,
+		disable = {
+			move = true,
+			car = true,
+			combat = true,
+		},
+		anim = {
+			dict = 'timetable@gardener@filling_can',
+			clip = 'gar_ig_5_filling_can',
+			flags = 49,
+		}
+	}) then
 		if exports.ox_inventory:GetItemCount('WEAPON_PETROLCAN') then
 			return TriggerServerEvent('ox_fuel:fuelCan', currentFuel, state.nearestStation)
 		end
-
 	end
 
 	ClearPedTasks(cache.ped)
@@ -59,6 +67,7 @@ function fuel.startFueling(vehicle, isPump)
 	local vehState = Entity(vehicle).state
 	local fuelAmount = vehState.fuel or GetVehicleFuelLevel(vehicle)
 	local duration = math.ceil((100 - fuelAmount) / config.refillValue) * config.refillTick
+
 	local initialAmount = fuelAmount
 	local durability = 0
 
@@ -88,44 +97,30 @@ function fuel.startFueling(vehicle, isPump)
 
 	state.isFueling = true
 
-	if not isPump then
-		TaskTurnPedToFaceEntity(cache.ped, vehicle, duration)
-	end
+	TaskTurnPedToFaceEntity(cache.ped, vehicle, duration)
+
 	Wait(500)
 
-	if not config.useHose then
-		CreateThread(function()
-			lib.progressCircle({
-				duration = duration,
-				useWhileDead = false,
-				canCancel = true,
-				disable = {
-					move = true,
-					car = true,
-					combat = true,
-				},
-				anim = {
-					dict = isPump and 'timetable@gardener@filling_can' or 'weapon@w_sp_jerrycan',
-					clip = isPump and 'gar_ig_5_filling_can' or 'fire',
-				},
-			})
+	CreateThread(function()
+		lib.progressBar({
+			label = 'Refueling Vehicle',
+			duration = duration,
+			useWhileDead = false,
+			canCancel = true,
+			allowSwimming = true,
+			disable = {
+				move = true,
+				car = true,
+				combat = true,
+			},
+			anim = {
+				dict = isPump and 'timetable@gardener@filling_can' or 'weapon@w_sp_jerrycan',
+				clip = isPump and 'gar_ig_5_filling_can' or 'fire',
+			},
+		})
 
-			state.isFueling = false
-		end)
-	elseif isPump then
-		-- CreateThread(function()
-		-- 	lib.progressCircle({
-		-- 		duration = duration,
-		-- 		useWhileDead = false,
-		-- 		canCancel = true,
-		-- 		disable = {
-		-- 			car = true,
-		-- 		},
-		-- 	})
-
-		-- 	state.isFueling = false
-		-- end)
-	end
+		state.isFueling = false
+	end)
 
 	while state.isFueling do
 		if isPump then
@@ -146,8 +141,6 @@ function fuel.startFueling(vehicle, isPump)
 
 		state.refillingValue = fuelAmount
 
-		print('Started Refueling', fuelAmount)
-
 		if fuelAmount >= 100 then
 			state.isFueling = false
 			fuelAmount = 100.0
@@ -157,10 +150,6 @@ function fuel.startFueling(vehicle, isPump)
 	end
 
 	ClearPedTasks(cache.ped)
-	RemoveAnimDict("anim@am_hold_up@male") -- Grabbing Nozle
-	RemoveAnimDict("timetable@gardener@filling_can") -- Fueling Vehicle
-
-	print('Stopped Filling Fuel')
 
 	if isPump then
 		TriggerServerEvent('ox_fuel:pay', fuelAmount, initialAmount, NetworkGetNetworkIdFromEntity(vehicle))
@@ -168,13 +157,5 @@ function fuel.startFueling(vehicle, isPump)
 		TriggerServerEvent('ox_fuel:updateFuelCan', durability, NetworkGetNetworkIdFromEntity(vehicle), fuelAmount, initialAmount)
 	end
 end
-
-RegisterCommand('setfuel:ox', function()
-	if not cache.vehicle then print('No Car Found') return end
-
-	local vehState = Entity(cache.vehicle).state
-	
-	fuel.setFuel(vehState, cache.vehicle, 10, true)
-end)
 
 return fuel

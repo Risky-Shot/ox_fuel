@@ -16,13 +16,13 @@ return {
 	*/
 	showBlips = 2,
 
-	-- Total duration (ex. 10% missing fuel): 10 / 0.25 * 250 = 10 seconds
+	-- Total duration (ex. 10% missing fuel): 10 / 1.0 * 1000 = 10 seconds
 
-	-- Fuel refill value (every 250msec add 0.25%)
-	refillValue = 0.50,
+	-- Fuel refill value (every 1000msec add 1%)
+	refillValue = 1.0,
 
-	-- Fuel tick time (every 250 msec)
-	refillTick = 250,
+	-- Fuel tick time (every 1000 msec) Do Not Change
+	refillTick = 1000,
 
 	-- Fuel cost (Added once every tick) amount filled * defaultPrice
 	defaultPrice = 5,
@@ -53,6 +53,32 @@ return {
 		`prop_gas_pump_1d`,
 	},
 
+	-- Vehicle class allowed to refill with /startfueling command
+	commandClass = {
+		[0] = false, -- Compacts
+		[1] = false, -- Sedans
+		[2] = false, -- SUVs
+		[3] = false, -- Coupes
+		[4] = false, -- Muscle
+		[5] = false, -- Sports Classics
+		[6] = false, -- Sports
+		[7] = false, -- Super
+		[8] = false, -- Motorcycles
+		[9] = false, -- Off-road
+		[10] = false, -- Industrial
+		[11] = false, -- Utility
+		[12] = false, -- Vans
+		[13] = false, -- Cycles
+		[14] = true, -- Boats
+		[15] = true, -- Helicopters
+		[16] = true, -- Planes
+		[17] = false, -- Service
+		[18] = false, -- Emergency
+		[19] = false, -- Military
+		[20] = false, -- Commercial
+		[21] = false, -- Trains
+	},
+	
 	-- Limit of station reserve, below this disable fuel up (only for player-owned)
 	stationReserve = 500.0,
 

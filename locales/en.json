@@ -20,5 +20,10 @@
 	"grab_nozzle": "Grab Nozzle",
 	"insert_nozzle": "Insert Nozzle",
 	"station_empty": "Not Enough Fuel in station.",
-	"engine_on": "Please Turn Off the ignition."
+	"engine_on": "Please Turn Off the ignition.",
+	"already_nozzle_veh": "Fuel Nozzle Already Attached to Vehicle.",
+	"nozzle_veh_success": "Attached Fuel Nozzle to Vehicle",
+	"command_suggest": "Please use /refuel to start fueling the vehicle.",
+	"not_near_station": "You are not near a fuel station.",
+	"vehicle_class": "You are not allowed to fill this vehicle here."
 }

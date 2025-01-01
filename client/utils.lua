@@ -1,12 +1,27 @@
 local utils = {}
 
+local stations = lib.load 'data.stations'
+
+function utils.getNearestPump(stationId, coords)
+	local pump = nil
+
+	for pumpId, pumpCoords in pairs(stations[stationId].pumps) do
+		if #(pumpCoords - coords) < 0.5 then
+			pump = pumpId
+			break
+		end
+	end
+
+	return pump
+end
+
 ---@param coords vector3
 ---@return integer
-function utils.createBlip(coords)
+function utils.createBlip(coords, blipData)
 	local blip = AddBlipForCoord(coords.x, coords.y, coords.z)
 	SetBlipSprite(blip, 361)
 	SetBlipDisplay(blip, 4)
-	SetBlipScale(blip, 0.8)
+	SetBlipScale(blip, 0.6)
 	SetBlipColour(blip, 6)
 	SetBlipAsShortRange(blip, true)
 	BeginTextCommandSetBlipName('ox_fuel_station')
@@ -32,11 +47,11 @@ function utils.getVehicleInFront()
 end
 
 local bones = {
-	'petrolcap',
-	'petroltank',
-	'petroltank_l',
-	'hub_lr',
-	'engine',
+	"petroltank",
+	"petroltank_l",
+	"petroltank_r",
+	"hub_lr",
+	"seat_dside_r",
 }
 
 ---@param vehicle integer
@@ -76,5 +91,29 @@ utils.getMoney = defaultMoneyCheck
 exports('setMoneyCheck', function(fn)
 	utils.getMoney = fn or defaultMoneyCheck
 end)
+
+function utils.getEntityFromStateBag(bagName, keyName)
+
+    if bagName:find('entity:') then
+        local netId = tonumber(bagName:gsub('entity:', ''), 10)
+
+        local entity =  lib.waitFor(function()
+            if NetworkDoesEntityExistWithNetworkId(netId) then return NetworkGetEntityFromNetworkId(netId) end
+        end, ('%s received invalid entity! (%s)'):format(keyName, bagName), 10000)
+
+        return entity
+    elseif bagName:find('player:') then
+        local serverId = tonumber(bagName:gsub('player:', ''), 10)
+        local playerId = GetPlayerFromServerId(serverId)
+
+        local entity = lib.waitFor(function()
+            local ped = GetPlayerPed(playerId)
+            if ped > 0 then return ped end
+        end, ('%s received invalid entity! (%s)'):format(keyName, bagName), 10000)
+
+        return serverId, entity
+    end
+
+end
 
 return utils
